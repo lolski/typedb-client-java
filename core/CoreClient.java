@@ -24,6 +24,7 @@ import grakn.client.api.GraknClient;
 import grakn.client.api.GraknOptions;
 import grakn.client.api.GraknSession;
 import grakn.client.common.exception.GraknClientException;
+import grakn.client.common.rpc.GraknChannel;
 import grakn.client.common.rpc.GraknStub;
 import grakn.client.stream.RequestTransmitter;
 import grakn.common.concurrent.NamedThreadFactory;
@@ -54,28 +55,13 @@ public class CoreClient implements GraknClient {
     private final CoreDatabaseManager databaseMgr;
     private final ConcurrentMap<ByteString, CoreSession> sessions;
 
-    public CoreClient(String address) {
-        this(address, calculateParallelisation());
+    public CoreClient(String address, GraknChannel graknChannel) {
+        this(address, graknChannel, calculateParallelisation());
     }
 
-    public CoreClient(String address, int parallelisation) {
+    public CoreClient(String address, GraknChannel graknChannel, int parallelisation) {
         NamedThreadFactory threadFactory = NamedThreadFactory.create(GRAKN_CLIENT_RPC_THREAD_NAME);
-        SslContext sslContext = null;
-        try {
-            sslContext = GrpcSslContexts.forClient()
-                    .trustManager(
-                            Paths.get(
-                            "/Users/lolski/vaticle/vaticle/typedb-cluster/server/conf/tls/ca-cert.pem"
-                            ).toFile()
-                    )
-                    .build();
-        } catch (SSLException e) {
-            throw new RuntimeException(e);
-        }
-        channel = NettyChannelBuilder.forTarget(address)
-                .useTransportSecurity()
-                .sslContext(sslContext)
-                .build();
+        channel = graknChannel.forAddress(address);
         stub = GraknStub.core(channel);
         transmitter = new RequestTransmitter(parallelisation, threadFactory);
         databaseMgr = new CoreDatabaseManager(this);

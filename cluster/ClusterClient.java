@@ -23,6 +23,7 @@ import grakn.client.api.GraknClient;
 import grakn.client.api.GraknOptions;
 import grakn.client.api.GraknSession;
 import grakn.client.common.exception.GraknClientException;
+import grakn.client.common.rpc.GraknChannel;
 import grakn.client.common.rpc.GraknStub;
 import grakn.client.core.CoreClient;
 import grakn.common.collection.Pair;
@@ -30,7 +31,9 @@ import grakn.protocol.ClusterServerProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +41,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import static grakn.client.common.exception.ErrorMessage.Client.CLUSTER_UNABLE_TO_CONNECT;
 import static grakn.client.common.exception.ErrorMessage.Client.UNABLE_TO_CONNECT;
+import static grakn.client.common.exception.ErrorMessage.Internal.ILLEGAL_ARGUMENT;
 import static grakn.client.common.rpc.RequestBuilder.Cluster.ServerManager.allReq;
 import static grakn.common.collection.Collections.pair;
 import static java.util.stream.Collectors.toMap;
@@ -46,19 +50,27 @@ import static java.util.stream.Collectors.toSet;
 public class ClusterClient implements GraknClient.Cluster {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClusterClient.class);
+
+    private final boolean tlsEnabled;
+    @Nullable
+    private final Path tlsRootCA;
+    private final int parallelisation;
     private final Map<String, CoreClient> coreClients;
     private final Map<String, GraknStub.Cluster> stubs;
     private final ClusterDatabaseManager databaseMgrs;
     private final ConcurrentMap<String, ClusterDatabase> clusterDatabases;
     private boolean isOpen;
 
-    public ClusterClient(Set<String> addresses, boolean tlsEnabled, Path tlsRootCA) {
+    public ClusterClient(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA) {
         this(addresses, tlsEnabled, tlsRootCA, CoreClient.calculateParallelisation());
     }
 
-    public ClusterClient(Set<String> addresses, boolean tlsEnabled, Path tlsRootCA, int parallelisation) {
+    public ClusterClient(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA, int parallelisation) {
+        this.tlsEnabled = tlsEnabled;
+        this.tlsRootCA = tlsRootCA != null ? Paths.get(tlsRootCA) : null;
+        this.parallelisation = parallelisation;
         coreClients = fetchServerAddresses(addresses).stream()
-                .map(address -> pair(address, new CoreClient(address, parallelisation)))
+                .map(address -> pair(address, createCoreClient(address, tlsEnabled, this.tlsRootCA, parallelisation)))
                 .collect(toMap(Pair::first, Pair::second));
         stubs = coreClients.entrySet().stream()
                 .map(client -> pair(client.getKey(), GraknStub.cluster(client.getValue().channel())))
@@ -70,7 +82,7 @@ public class ClusterClient implements GraknClient.Cluster {
 
     private Set<String> fetchServerAddresses(Set<String> addresses) {
         for (String address : addresses) {
-            try (CoreClient client = new CoreClient(address)) {
+            try (CoreClient client = createCoreClient(address, tlsEnabled, tlsRootCA, parallelisation)) {
                 LOG.debug("Fetching list of cluster servers from {}...", address);
                 GraknStub.Cluster stub = GraknStub.cluster(client.channel());
                 ClusterServerProto.ServerManager.All.Res res = stub.serversAll(allReq());
@@ -87,6 +99,15 @@ public class ClusterClient implements GraknClient.Cluster {
             }
         }
         throw new GraknClientException(CLUSTER_UNABLE_TO_CONNECT, String.join(",", addresses));
+    }
+
+    private CoreClient createCoreClient(String address, boolean tlsEnabled, @Nullable Path tlsRootCA, int parallelisation) {
+        if (tlsEnabled) {
+            GraknChannel channel = tlsRootCA != null ? new GraknChannel.TLS(tlsRootCA) : new GraknChannel.TLS();
+            return new CoreClient(address, channel, parallelisation);
+        } else {
+            return new CoreClient(address, new GraknChannel.PlainText(), parallelisation);
+        }
     }
 
     @Override
