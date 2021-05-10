@@ -23,6 +23,7 @@ import grakn.client.api.GraknClient;
 import grakn.client.cluster.ClusterClient;
 import grakn.client.core.CoreClient;
 
+import java.nio.file.Path;
 import java.util.Set;
 
 import static grakn.common.collection.Collections.set;
@@ -39,19 +40,35 @@ public class Grakn {
         return new CoreClient(address, parallelisation);
     }
 
-    public static GraknClient.Cluster clusterClient(String address) {
-        return new ClusterClient(set(address));
+    public static GraknClient.Cluster clusterClient(String address, boolean tlsEnabled) {
+        return new ClusterClient(set(address), tlsEnabled, null);
     }
 
-    public static GraknClient.Cluster clusterClient(String address, int parallelisation) {
-        return new ClusterClient(set(address), parallelisation);
+    public static GraknClient.Cluster clusterClient(String address, boolean tlsEnabled, Path tlsRootCA) {
+        return new ClusterClient(set(address), tlsEnabled, tlsRootCA);
     }
 
-    public static GraknClient.Cluster clusterClient(Set<String> addresses) {
-        return new ClusterClient(addresses);
+    public static GraknClient.Cluster clusterClient(String address, boolean tlsEnabled, int parallelisation) {
+        return new ClusterClient(set(address), tlsEnabled, null, parallelisation);
     }
 
-    public static GraknClient.Cluster clusterClient(Set<String> addresses, int parallelisation) {
-        return new ClusterClient(addresses, parallelisation);
+    public static GraknClient.Cluster clusterClient(String address, boolean tlsEnabled, Path tlsRootCA, int parallelisation) {
+        return new ClusterClient(set(address), tlsEnabled, tlsRootCA, parallelisation);
+    }
+
+    public static GraknClient.Cluster clusterClient(Set<String> addresses, boolean tlsEnabled) {
+        return new ClusterClient(addresses, tlsEnabled, null);
+    }
+
+    public static GraknClient.Cluster clusterClient(Set<String> addresses, boolean tlsEnabled, Path tlsRootCA) {
+        return new ClusterClient(addresses, tlsEnabled, tlsRootCA);
+    }
+
+    public static GraknClient.Cluster clusterClient(Set<String> addresses, boolean tlsEnabled, int parallelisation) {
+        return new ClusterClient(addresses, tlsEnabled, null, parallelisation);
+    }
+
+    public static GraknClient.Cluster clusterClient(Set<String> addresses, boolean tlsEnabled, Path tlsRootCA, int parallelisation) {
+        return new ClusterClient(addresses, tlsEnabled, tlsRootCA, parallelisation);
     }
 }

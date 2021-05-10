@@ -30,6 +30,7 @@ import grakn.protocol.ClusterServerProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,11 +52,11 @@ public class ClusterClient implements GraknClient.Cluster {
     private final ConcurrentMap<String, ClusterDatabase> clusterDatabases;
     private boolean isOpen;
 
-    public ClusterClient(Set<String> addresses) {
-        this(addresses, CoreClient.calculateParallelisation());
+    public ClusterClient(Set<String> addresses, boolean tlsEnabled, Path tlsRootCA) {
+        this(addresses, tlsEnabled, tlsRootCA, CoreClient.calculateParallelisation());
     }
 
-    public ClusterClient(Set<String> addresses, int parallelisation) {
+    public ClusterClient(Set<String> addresses, boolean tlsEnabled, Path tlsRootCA, int parallelisation) {
         coreClients = fetchServerAddresses(addresses).stream()
                 .map(address -> pair(address, new CoreClient(address, parallelisation)))
                 .collect(toMap(Pair::first, Pair::second));
