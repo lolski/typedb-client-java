@@ -68,7 +68,6 @@ public abstract class GraknStub {
             ensureConnected();
             return function.get();
         } catch (StatusRuntimeException e) {
-            e.printStackTrace();
             throw GraknClientException.of(e);
         }
     }

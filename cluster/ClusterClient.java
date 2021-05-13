@@ -90,7 +90,6 @@ public class ClusterClient implements GraknClient.Cluster {
                 LOG.debug("The cluster servers are {}", members);
                 return members;
             } catch (GraknClientException e) {
-                e.printStackTrace();
                 if (e.getErrorMessage().equals(UNABLE_TO_CONNECT)) {
                     LOG.error("Fetching cluster servers from {} failed.", address);
                 } else {
