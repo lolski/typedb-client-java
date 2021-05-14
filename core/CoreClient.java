@@ -24,7 +24,7 @@ import grakn.client.api.GraknClient;
 import grakn.client.api.GraknOptions;
 import grakn.client.api.GraknSession;
 import grakn.client.common.exception.GraknClientException;
-import grakn.client.common.rpc.GraknChannel;
+import grakn.client.common.rpc.ManagedChannelFactory;
 import grakn.client.common.rpc.GraknStub;
 import grakn.client.stream.RequestTransmitter;
 import grakn.common.concurrent.NamedThreadFactory;
@@ -47,13 +47,13 @@ public class CoreClient implements GraknClient {
     private final CoreDatabaseManager databaseMgr;
     private final ConcurrentMap<ByteString, CoreSession> sessions;
 
-    private CoreClient(String address, GraknChannel graknChannel) {
-        this(address, graknChannel, calculateParallelisation());
+    private CoreClient(String address, ManagedChannelFactory managedChannelFactory) {
+        this(address, managedChannelFactory, calculateParallelisation());
     }
 
-    protected CoreClient(String address, GraknChannel graknChannel, int parallelisation) {
+    protected CoreClient(String address, ManagedChannelFactory managedChannelFactory, int parallelisation) {
         NamedThreadFactory threadFactory = NamedThreadFactory.create(GRAKN_CLIENT_RPC_THREAD_NAME);
-        channel = graknChannel.forAddress(address);
+        channel = managedChannelFactory.forAddress(address);
         stub = GraknStub.core(channel);
         transmitter = new RequestTransmitter(parallelisation, threadFactory);
         databaseMgr = new CoreDatabaseManager(this);
@@ -61,11 +61,11 @@ public class CoreClient implements GraknClient {
     }
 
     public static CoreClient create(String address) {
-        return new CoreClient(address, new GraknChannel.PlainText());
+        return new CoreClient(address, new ManagedChannelFactory.PlainText());
     }
 
     public static CoreClient create(String address, int parallelisation) {
-        return new CoreClient(address, new GraknChannel.PlainText(), parallelisation);
+        return new CoreClient(address, new ManagedChannelFactory.PlainText(), parallelisation);
     }
 
     public static int calculateParallelisation() {

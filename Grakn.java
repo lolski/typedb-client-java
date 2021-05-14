@@ -21,10 +21,8 @@ package grakn.client;
 
 import grakn.client.api.GraknClient;
 import grakn.client.cluster.ClusterClient;
-import grakn.client.common.rpc.GraknChannel;
 import grakn.client.core.CoreClient;
 
-import java.nio.file.Path;
 import java.util.Set;
 
 import static grakn.common.collection.Collections.set;

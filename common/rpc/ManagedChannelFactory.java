@@ -9,12 +9,11 @@ import io.netty.handler.ssl.SslContext;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
-public interface GraknChannel {
+public interface ManagedChannelFactory {
     ManagedChannel forAddress(String address);
 
-    class PlainText implements GraknChannel {
+    class PlainText implements ManagedChannelFactory {
         @Override
         public ManagedChannel forAddress(String address) {
             return NettyChannelBuilder.forTarget(address)
@@ -23,7 +22,7 @@ public interface GraknChannel {
         }
     }
 
-    class TLS implements GraknChannel {
+    class TLS implements ManagedChannelFactory {
         @Nullable
         private final Path tlsRootCA;
 
