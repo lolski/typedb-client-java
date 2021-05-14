@@ -23,9 +23,7 @@ import grakn.client.api.GraknClient;
 import grakn.client.api.GraknOptions;
 import grakn.client.api.GraknSession;
 import grakn.client.common.exception.GraknClientException;
-import grakn.client.common.rpc.GraknChannel;
 import grakn.client.common.rpc.GraknStub;
-import grakn.client.core.CoreClient;
 import grakn.common.collection.Pair;
 import grakn.protocol.ClusterServerProto;
 import org.slf4j.Logger;
@@ -41,7 +39,6 @@ import java.util.concurrent.ConcurrentMap;
 
 import static grakn.client.common.exception.ErrorMessage.Client.CLUSTER_UNABLE_TO_CONNECT;
 import static grakn.client.common.exception.ErrorMessage.Client.UNABLE_TO_CONNECT;
-import static grakn.client.common.exception.ErrorMessage.Internal.ILLEGAL_ARGUMENT;
 import static grakn.client.common.rpc.RequestBuilder.Cluster.ServerManager.allReq;
 import static grakn.common.collection.Collections.pair;
 import static java.util.stream.Collectors.toMap;
@@ -55,24 +52,24 @@ public class ClusterClient implements GraknClient.Cluster {
     @Nullable
     private final Path tlsRootCA;
     private final int parallelisation;
-    private final Map<String, CoreClient> coreClients;
+    private final Map<String, ClusterNodeClient> clusterNodeClients;
     private final Map<String, GraknStub.Cluster> stubs;
     private final ClusterDatabaseManager databaseMgrs;
     private final ConcurrentMap<String, ClusterDatabase> clusterDatabases;
     private boolean isOpen;
 
-    public ClusterClient(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA) {
-        this(addresses, tlsEnabled, tlsRootCA, CoreClient.calculateParallelisation());
+    ClusterClient(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA) {
+        this(addresses, tlsEnabled, tlsRootCA, ClusterNodeClient.calculateParallelisation());
     }
 
-    public ClusterClient(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA, int parallelisation) {
+    ClusterClient(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA, int parallelisation) {
         this.tlsEnabled = tlsEnabled;
         this.tlsRootCA = tlsRootCA != null ? Paths.get(tlsRootCA) : null;
         this.parallelisation = parallelisation;
-        coreClients = fetchServerAddresses(addresses).stream()
-                .map(address -> pair(address, createCoreClient(address, tlsEnabled, this.tlsRootCA, parallelisation)))
+        clusterNodeClients = fetchServerAddresses(addresses).stream()
+                .map(address -> pair(address, ClusterNodeClient.create(address, tlsEnabled, this.tlsRootCA, parallelisation)))
                 .collect(toMap(Pair::first, Pair::second));
-        stubs = coreClients.entrySet().stream()
+        stubs = clusterNodeClients.entrySet().stream()
                 .map(client -> pair(client.getKey(), GraknStub.cluster(client.getValue().channel())))
                 .collect(toMap(Pair::first, Pair::second));
         databaseMgrs = new ClusterDatabaseManager(this);
@@ -80,9 +77,17 @@ public class ClusterClient implements GraknClient.Cluster {
         isOpen = true;
     }
 
+    public static ClusterClient create(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA) {
+        return new ClusterClient(addresses, tlsEnabled, tlsRootCA);
+    }
+
+    public static ClusterClient create(Set<String> addresses, boolean tlsEnabled, @Nullable String tlsRootCA, int parallelisation) {
+        return new ClusterClient(addresses, tlsEnabled, tlsRootCA, parallelisation);
+    }
+
     private Set<String> fetchServerAddresses(Set<String> addresses) {
         for (String address : addresses) {
-            try (CoreClient client = createCoreClient(address, tlsEnabled, tlsRootCA, parallelisation)) {
+            try (ClusterNodeClient client = ClusterNodeClient.create(address, tlsEnabled, tlsRootCA, parallelisation)) {
                 LOG.debug("Fetching list of cluster servers from {}...", address);
                 GraknStub.Cluster stub = GraknStub.cluster(client.channel());
                 ClusterServerProto.ServerManager.All.Res res = stub.serversAll(allReq());
@@ -98,15 +103,6 @@ public class ClusterClient implements GraknClient.Cluster {
             }
         }
         throw new GraknClientException(CLUSTER_UNABLE_TO_CONNECT, String.join(",", addresses));
-    }
-
-    private CoreClient createCoreClient(String address, boolean tlsEnabled, @Nullable Path tlsRootCA, int parallelisation) {
-        if (tlsEnabled) {
-            GraknChannel channel = tlsRootCA != null ? new GraknChannel.TLS(tlsRootCA) : new GraknChannel.TLS();
-            return new CoreClient(address, channel, parallelisation);
-        } else {
-            return new CoreClient(address, new GraknChannel.PlainText(), parallelisation);
-        }
     }
 
     @Override
@@ -157,16 +153,16 @@ public class ClusterClient implements GraknClient.Cluster {
         return clusterDatabases;
     }
 
-    Map<String, CoreClient> coreClients() {
-        return coreClients;
+    Map<String, ClusterNodeClient> clusterNodeClients() {
+        return clusterNodeClients;
     }
 
-    Set<String> clusterMembers() {
-        return coreClients.keySet();
+    Set<String> clusterNodes() {
+        return clusterNodeClients.keySet();
     }
 
-    CoreClient coreClient(String address) {
-        return coreClients.get(address);
+    ClusterNodeClient clusterNodeClient(String address) {
+        return clusterNodeClients.get(address);
     }
 
     GraknStub.Cluster stub(String address) {
@@ -185,7 +181,7 @@ public class ClusterClient implements GraknClient.Cluster {
 
     @Override
     public void close() {
-        coreClients.values().forEach(CoreClient::close);
+        clusterNodeClients.values().forEach(ClusterNodeClient::close);
         isOpen = false;
     }
 }

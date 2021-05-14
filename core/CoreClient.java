@@ -29,15 +29,7 @@ import grakn.client.common.rpc.GraknStub;
 import grakn.client.stream.RequestTransmitter;
 import grakn.common.concurrent.NamedThreadFactory;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
 
-import javax.net.ssl.SSLException;
-import java.nio.file.Paths;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -55,17 +47,25 @@ public class CoreClient implements GraknClient {
     private final CoreDatabaseManager databaseMgr;
     private final ConcurrentMap<ByteString, CoreSession> sessions;
 
-    public CoreClient(String address, GraknChannel graknChannel) {
+    private CoreClient(String address, GraknChannel graknChannel) {
         this(address, graknChannel, calculateParallelisation());
     }
 
-    public CoreClient(String address, GraknChannel graknChannel, int parallelisation) {
+    protected CoreClient(String address, GraknChannel graknChannel, int parallelisation) {
         NamedThreadFactory threadFactory = NamedThreadFactory.create(GRAKN_CLIENT_RPC_THREAD_NAME);
         channel = graknChannel.forAddress(address);
         stub = GraknStub.core(channel);
         transmitter = new RequestTransmitter(parallelisation, threadFactory);
         databaseMgr = new CoreDatabaseManager(this);
         sessions = new ConcurrentHashMap<>();
+    }
+
+    public static CoreClient create(String address) {
+        return new CoreClient(address, new GraknChannel.PlainText());
+    }
+
+    public static CoreClient create(String address, int parallelisation) {
+        return new CoreClient(address, new GraknChannel.PlainText(), parallelisation);
     }
 
     public static int calculateParallelisation() {
