@@ -158,8 +158,8 @@ build:
         test-behaviour-definable-core, test-behaviour-definable-cluster
       ]
       filter:
-        owner: vaticle
-        branch: master
+        owner: lolski
+        branch: java-8-support
       command: |
         export DEPLOY_MAVEN_USERNAME=$REPO_VATICLE_USERNAME
         export DEPLOY_MAVEN_PASSWORD=$REPO_VATICLE_PASSWORD
